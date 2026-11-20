@@ -19,7 +19,7 @@ def settings(tmp_path: Path) -> Settings:
     return Settings(
         data_dir=tmp_path,
         teacher_token="teacher-token",
-        exam_minutes=25,
+        exam_minutes=30,
         attempts_per_task=2,
         run_timeout_seconds=1,
         run_budget_seconds=3,
@@ -66,13 +66,15 @@ def test_start_requires_consent(client: TestClient) -> None:
 def test_exam_page_has_five_tasks_without_hidden_tests(client: TestClient) -> None:
     session_id, config = _start(client)
     assert len(config["tasks"]) == 5
-    assert config["remainingSeconds"] > 1400
+    assert config["remainingSeconds"] > 1700
     page = client.get(f"/exam/{session_id}")
     assert page.status_code == 200
     assert "Скрытые тесты" not in page.text
     assert '"tests"' not in page.text
     assert 'id="fullscreen-gate"' in page.text
     assert 'id="enter-fullscreen"' in page.text
+    assert "/static/vendor/codemirror/codemirror.js" in page.text
+    assert "/static/vendor/codemirror/mode/python/python.js" in page.text
     first_code = tasks_by_id()[config["tasks"][0]["id"]].code
     assert f"# {first_code}" in page.text
 
@@ -102,6 +104,9 @@ def test_run_counts_attempts_and_rejects_after_limit(client: TestClient) -> None
     payload = first.json()
     assert payload["attempts_left"] == 1
     assert payload["total"] >= 6
+    assert payload["failed_tests"]
+    assert payload["first_failure"]["number"] == payload["failed_tests"][0]
+    assert payload["first_failure"]["expected"] != payload["first_failure"]["actual"]
     second = client.post(
         f"/api/exam/{session_id}/run",
         json={"task_id": task_id, "code": "print(1)"},
@@ -123,7 +128,7 @@ def test_correct_run_solves_task(client: TestClient, settings: Settings) -> None
         "Анна",
         chosen,
         started_at=time.time(),
-        deadline=time.time() + 1500,
+        deadline=time.time() + 1800,
         client_ip=None,
     )
     client.cookies.set(COOKIE_NAME, f"{session_id}.{token}")
@@ -143,6 +148,12 @@ def test_correct_run_solves_task(client: TestClient, settings: Settings) -> None
     )
     assert again.status_code == 409
     assert again.json()["error"] == "solved"
+
+    client.post(f"/api/exam/{session_id}/finish", json={})
+    result_page = client.get(f"/result/{session_id}")
+    assert result_page.status_code == 200
+    assert "final-code-body" in result_page.text
+    assert "print(l // 100)" in result_page.text
 
 
 def test_violation_bans_session(client: TestClient) -> None:
@@ -175,6 +186,7 @@ def test_finish_and_result(client: TestClient) -> None:
     page = client.get(f"/result/{session_id}")
     assert page.status_code == 200
     assert "задач решено" in page.text
+    assert "Код решения не сохранился." in page.text
 
 
 def test_cookie_is_required(client: TestClient) -> None:

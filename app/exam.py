@@ -110,6 +110,7 @@ def build_result_view(
                 "best_passed": row["best_passed"],
                 "total_tests": row["total_tests"],
                 "solved": bool(row["solved"]),
+                "code": row["code"],
             }
         )
     return {

@@ -45,10 +45,44 @@ class TestOutcome:
     total: int
     error_kind: str | None
     duration_ms: int
+    first_failure: dict[str, object] | None = None
+    failed_tests: tuple[int, ...] = ()
+    error_message: str | None = None
 
     @property
     def solved(self) -> bool:
         return self.passed == self.total
+
+
+def _brief(text: str, limit: int = 320) -> str:
+    cleaned = (text or "").replace("\r\n", "\n").strip("\n")
+    if len(cleaned) > limit:
+        return cleaned[:limit] + "\n…"
+    return cleaned
+
+
+def _error_line(stderr: str) -> str | None:
+    lines = [line.strip() for line in stderr.splitlines() if line.strip()]
+    if not lines:
+        return None
+    return _brief(lines[-1], 180)
+
+
+def _failure(
+    number: int,
+    reason: str,
+    case: dict[str, str],
+    actual: str,
+    message: str | None = None,
+) -> dict[str, object]:
+    return {
+        "number": number,
+        "reason": reason,
+        "input": _brief(case["input"]),
+        "expected": _brief(case["output"]),
+        "actual": _brief(actual),
+        "message": message,
+    }
 
 
 def runner_command() -> list[str]:
@@ -155,12 +189,19 @@ def run_tests(
     total = len(cases)
     passed = 0
     error_kind: str | None = None
+    error_message: str | None = None
+    first_failure: dict[str, object] | None = None
+    failed_tests: list[int] = []
     started = time.monotonic()
-    for case in cases:
+    for index, case in enumerate(cases, start=1):
         elapsed = time.monotonic() - started
         remaining_budget = settings.run_budget_seconds - elapsed
         if remaining_budget <= 0.05:
             error_kind = "timeout"
+            error_message = "Исчерпан общий лимит времени на запуск."
+            failed_tests.extend(range(index, total + 1))
+            if first_failure is None:
+                first_failure = _failure(index, "timeout", case, "", error_message)
             break
         result = execute_code(
             code,
@@ -170,16 +211,38 @@ def run_tests(
         )
         if result.timed_out:
             error_kind = "timeout"
+            error_message = "Превышено время выполнения одного теста."
+            failed_tests.extend(range(index, total + 1))
+            first_failure = first_failure or _failure(
+                index, "timeout", case, result.stdout, error_message
+            )
             break
         if result.returncode != 0:
             error_kind = result.error_kind
+            error_message = _error_line(result.stderr)
+            failed_tests.extend(range(index, total + 1))
+            first_failure = first_failure or _failure(
+                index, "error", case, result.stdout, error_message
+            )
             break
         if compare_output(case["output"], result.stdout):
             passed += 1
         else:
             error_kind = error_kind or "wrong_answer"
+            failed_tests.append(index)
+            first_failure = first_failure or _failure(
+                index, "wrong_answer", case, result.stdout
+            )
     duration_ms = int((time.monotonic() - started) * 1000)
-    return TestOutcome(passed=passed, total=total, error_kind=error_kind, duration_ms=duration_ms)
+    return TestOutcome(
+        passed=passed,
+        total=total,
+        error_kind=error_kind,
+        duration_ms=duration_ms,
+        first_failure=first_failure,
+        failed_tests=tuple(failed_tests),
+        error_message=error_message,
+    )
 
 
 def find_runner() -> Path | None:

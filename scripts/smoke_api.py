@@ -52,8 +52,10 @@ def main() -> int:
             print("start failed", start.status_code, start.text[:200])
             return 1
         config = parse_config(start.text)
+        assert config["remainingSeconds"] > 1700, "exam is not 30 minutes"
         assert 'id="fullscreen-gate"' in start.text, "fullscreen gate missing"
         assert 'id="enter-fullscreen"' in start.text, "fullscreen button missing"
+        assert 'class="CodeMirror' in start.text or "codemirror.js" in start.text
         chosen = next((task for task in config["tasks"] if task["id"] in KNOWN), None)
         if chosen is None:
             client.close()
@@ -73,6 +75,8 @@ def main() -> int:
         client.post(f"/api/exam/{config['sessionId']}/finish", json={})
         result = client.get(f"/result/{config['sessionId']}")
         assert result.status_code == 200 and "задач решено" in result.text
+        assert "final-code-body" in result.text
+        assert KNOWN[task_id].splitlines()[0] in result.text
 
         bad_client = httpx.Client(base_url=BASE, follow_redirects=True, timeout=30)
         bad_start = bad_client.post("/start", data={"name": "Sandbox Test", "consent": "yes"})

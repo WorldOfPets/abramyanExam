@@ -33,6 +33,21 @@ def test_wrong_solution_fails(settings: Settings) -> None:
     outcome = run_tests("print(1)\n", task.tests, settings)
     assert outcome.passed < outcome.total
     assert outcome.error_kind == "wrong_answer"
+    assert outcome.failed_tests
+    assert outcome.first_failure is not None
+    assert outcome.first_failure["number"] == outcome.failed_tests[0]
+    assert outcome.first_failure["expected"] != outcome.first_failure["actual"]
+    assert outcome.error_message is None
+
+
+def test_syntax_error_has_a_short_message(settings: Settings) -> None:
+    task = tasks_by_id()["integer-01"]
+    outcome = run_tests("print(\n", task.tests, settings)
+    assert outcome.error_kind == "not_allowed_or_syntax"
+    assert outcome.first_failure is not None
+    assert outcome.first_failure["reason"] == "error"
+    assert outcome.error_message
+    assert "SyntaxError" in str(outcome.error_message)
 
 
 def test_infinite_loop_times_out(settings: Settings) -> None:

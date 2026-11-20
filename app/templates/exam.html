@@ -1,5 +1,10 @@
 {% extends "base.html" %}
 {% block body_class %}exam-body{% endblock %}
+{% block head %}
+  <link rel="stylesheet" href="/static/vendor/codemirror/codemirror.css">
+  <link rel="stylesheet" href="/static/vendor/codemirror/addon/hint/show-hint.css">
+  <link rel="stylesheet" href="/static/vendor/codemirror/addon/dialog/dialog.css">
+{% endblock %}
 {% block content %}
 <header class="exam-topbar">
   <div class="exam-brand">
@@ -88,7 +93,10 @@
           <section class="editor-block">
             <div class="editor-head">
               <span>Решение на Python</span>
-              <span class="save-status" data-save-status="{{ task.id }}">сохранено</span>
+              <span class="editor-meta">
+                <span class="editor-cursor" data-cursor="{{ task.id }}">1:1</span>
+                <span class="save-status" data-save-status="{{ task.id }}">сохранено</span>
+              </span>
             </div>
             <textarea class="code-editor" data-code="{{ task.id }}" spellcheck="false"
                       autocomplete="off" autocapitalize="off" wrap="off"
@@ -96,11 +104,14 @@
                       aria-label="Код решения {{ task.code }}">{% if task.saved_code %}{{ task.saved_code }}{% else %}# {{ task.code }}
 # Читайте данные через input(), выводите ответ через print(){% endif %}</textarea>
             <div class="editor-actions">
-              <button class="btn run-button" type="button" data-run="{{ task.id }}"
-                      {% if task.solved %}disabled{% endif %}>
-                {% if task.solved %}Задача решена{% else %}Запустить код{% endif %}
-              </button>
-              <span class="hint">Ctrl + Enter — запустить</span>
+              <div class="editor-buttons">
+                <button class="btn run-button" type="button" data-run="{{ task.id }}"
+                        {% if task.solved %}disabled{% endif %}>
+                  {% if task.solved %}Задача решена{% else %}Запустить код{% endif %}
+                </button>
+                <button class="editor-tool" type="button" data-hint="{{ task.id }}">Подсказки</button>
+              </div>
+              <span class="hint" title="Tab — отступ, Ctrl+Space — подсказки, Ctrl+Enter — запуск">Tab · Ctrl+Space · Ctrl+Enter</span>
             </div>
             <div class="run-result" data-result="{{ task.id }}" role="status" aria-live="polite">
               {% if task.solved %}
@@ -146,5 +157,15 @@
 <script type="application/json" id="exam-config">{{ config|tojson }}</script>
 {% endblock %}
 {% block scripts %}
+<script src="/static/vendor/codemirror/codemirror.js" defer></script>
+<script src="/static/vendor/codemirror/mode/python/python.js" defer></script>
+<script src="/static/vendor/codemirror/addon/edit/closebrackets.js" defer></script>
+<script src="/static/vendor/codemirror/addon/edit/matchbrackets.js" defer></script>
+<script src="/static/vendor/codemirror/addon/selection/active-line.js" defer></script>
+<script src="/static/vendor/codemirror/addon/comment/comment.js" defer></script>
+<script src="/static/vendor/codemirror/addon/hint/show-hint.js" defer></script>
+<script src="/static/vendor/codemirror/addon/dialog/dialog.js" defer></script>
+<script src="/static/vendor/codemirror/addon/search/searchcursor.js" defer></script>
+<script src="/static/vendor/codemirror/addon/search/search.js" defer></script>
 <script src="/static/exam.js" defer></script>
 {% endblock %}

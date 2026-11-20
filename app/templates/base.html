@@ -6,6 +6,7 @@
   <meta name="robots" content="noindex, nofollow">
   <title>{{ title }}</title>
   <link rel="stylesheet" href="/static/style.css">
+  {% block head %}{% endblock %}
 </head>
 <body class="{% block body_class %}{% endblock %}">
   {% block content %}{% endblock %}

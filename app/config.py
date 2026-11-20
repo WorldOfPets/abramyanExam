@@ -57,7 +57,7 @@ class Settings:
     data_dir: Path = field(default_factory=_default_data_dir)
     host: str = "127.0.0.1"
     port: int = 8000
-    exam_minutes: float = 25.0
+    exam_minutes: float = 30.0
     attempts_per_task: int = 10
     run_timeout_seconds: float = 2.0
     run_budget_seconds: float = 8.0
@@ -88,7 +88,7 @@ class Settings:
             data_dir=data_dir,
             host=os.environ.get("EXAM_HOST", "127.0.0.1"),
             port=int(os.environ.get("EXAM_PORT", "8000")),
-            exam_minutes=float(os.environ.get("EXAM_MINUTES", "25")),
+            exam_minutes=float(os.environ.get("EXAM_MINUTES", "30")),
             attempts_per_task=int(os.environ.get("EXAM_ATTEMPTS", "10")),
             run_timeout_seconds=float(os.environ.get("EXAM_RUN_TIMEOUT", "2")),
             run_budget_seconds=float(os.environ.get("EXAM_RUN_BUDGET", "8")),

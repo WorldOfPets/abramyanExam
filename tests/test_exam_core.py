@@ -38,7 +38,7 @@ def test_session_authentication_and_view(repo: Repository, settings: Settings) -
     tasks = repo.get_session_tasks(session_id)
     assert len(tasks) == 5
     view = build_exam_view(session, tasks, settings, at=1010.0)
-    assert view["remaining_seconds"] == 25 * 60 - 10
+    assert view["remaining_seconds"] == 30 * 60 - 10
     assert all(task["attempts_left"] == 10 for task in view["tasks"])
     assert all("tests" not in task for task in view["tasks"])
 
@@ -115,7 +115,7 @@ def test_finish_and_ban(repo: Repository, settings: Settings) -> None:
 
 def test_sweep_expires_and_bans(repo: Repository, settings: Settings) -> None:
     expired_id, _ = start_exam(repo, settings, "A", None, at=1000.0)
-    repo.sweep(at=2600.0, grace_seconds=35.0)
+    repo.sweep(at=2900.0, grace_seconds=35.0)
     assert repo.get_session(expired_id)["status"] == "finished"
     assert repo.get_session(expired_id)["finish_reason"] == "timeout"
 

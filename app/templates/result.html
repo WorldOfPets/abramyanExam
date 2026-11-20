@@ -57,6 +57,36 @@
     </table>
   </section>
 
+  <section class="final-codes">
+    <div class="final-codes-head">
+      <div>
+        <p class="eyebrow">Финальные решения</p>
+        <h2>Код, с которым вы завершили экзамен</h2>
+      </div>
+      <span class="tiny">Можно раскрыть каждую задачу и проверить своё решение.</span>
+    </div>
+
+    {% for row in view.rows %}
+      <details class="final-code">
+        <summary>
+          <span>
+            <b>{{ row.task.code }}</b> · {{ row.task.title }}
+            {% if row.solved %}<span class="chip ok">решена</span>{% else %}<span class="chip">не решена</span>{% endif %}
+          </span>
+          <span class="final-code-meta">
+            {{ row.best_passed }} / {{ row.total_tests }} тестов
+            {% if row.code %}· {{ row.code|length }} символов{% endif %}
+          </span>
+        </summary>
+        {% if row.code %}
+          <pre class="final-code-body">{{ row.code }}</pre>
+        {% else %}
+          <p class="final-code-empty">Код решения не сохранился.</p>
+        {% endif %}
+      </details>
+    {% endfor %}
+  </section>
+
   <p class="tiny">Результат сохранён на этом компьютере. Преподаватель может выгрузить общую таблицу.</p>
 </main>
 {% endblock %}

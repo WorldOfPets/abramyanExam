@@ -19,6 +19,15 @@
     saveChains: new Map(),
   };
 
+  const editors = new Map();
+  const PY_HINTS = [
+    "input", "print", "int", "float", "str", "len", "range", "list", "map",
+    "sum", "min", "max", "abs", "round", "pow", "divmod", "sorted", "enumerate",
+    "zip", "math", "sqrt", "pi", "if", "elif", "else", "for", "while", "def",
+    "return", "True", "False", "None", "and", "or", "not", "in", "is", "break",
+    "continue", "try", "except", "pass", "import", "from",
+  ];
+
   for (const task of cfg.tasks) {
     state.solved[task.id] = Boolean(task.solved);
     state.attempts[task.id] = Number(task.attemptsLeft);
@@ -114,6 +123,78 @@
     box.appendChild(line);
   }
 
+  function addFailureField(parent, label, value, className = "") {
+    const field = document.createElement("div");
+    field.className = `failure-field ${className}`.trim();
+    const title = document.createElement("span");
+    title.textContent = label;
+    const pre = document.createElement("pre");
+    pre.textContent = value === "" || value === null || value === undefined ? "(пусто)" : String(value);
+    field.append(title, pre);
+    parent.appendChild(field);
+  }
+
+  function renderRunResult(taskId, data) {
+    const box = document.querySelector(`[data-result="${taskId}"]`);
+    if (!box) return;
+    box.textContent = "";
+
+    const summary = document.createElement("div");
+    summary.className = `result-line ${data.error_kind ? "bad" : "warn"}`;
+    summary.textContent = `Пройдено ${data.passed} из ${data.total} тестов.`;
+    box.appendChild(summary);
+
+    const errorText = data.error_message
+      || (data.error_kind && data.error_kind !== "wrong_answer"
+        ? ERROR_TEXT[data.error_kind]
+        : null);
+    if (errorText) {
+      const message = document.createElement("div");
+      message.className = "result-line bad";
+      message.textContent = `Ошибка: ${errorText}`;
+      box.appendChild(message);
+    }
+
+    if (Array.isArray(data.failed_tests) && data.failed_tests.length) {
+      const failed = document.createElement("div");
+      failed.className = "result-line warn";
+      failed.textContent = `Провалены тесты: ${data.failed_tests.join(", ")}.`;
+      box.appendChild(failed);
+    }
+
+    const failure = data.first_failure;
+    if (failure) {
+      const reasons = {
+        wrong_answer: "неверный ответ",
+        timeout: "превышено время",
+        error: "ошибка выполнения",
+      };
+      const details = document.createElement("details");
+      details.className = "failure-details";
+      details.open = true;
+      const caption = document.createElement("summary");
+      caption.textContent = `Тест ${failure.number}: ${reasons[failure.reason] || "провал"}`;
+      const body = document.createElement("div");
+      body.className = "failure-body";
+      addFailureField(body, "Ввод", failure.input);
+      addFailureField(body, "Ожидалось", failure.expected, "expected");
+      addFailureField(body, "Получено", failure.actual, "actual");
+      const note = document.createElement("p");
+      note.className = "failure-note";
+      note.textContent = "Показан только первый проваленный тест. Остальные тесты остаются скрытыми.";
+      body.appendChild(note);
+      details.append(caption, body);
+      box.appendChild(details);
+    }
+
+    if (Number(data.attempts_left) <= 0 && !data.solved) {
+      const empty = document.createElement("div");
+      empty.className = "result-line bad";
+      empty.textContent = "Попытки запуска закончились.";
+      box.appendChild(empty);
+    }
+  }
+
   function activateTask(taskId) {
     if (state.current && state.current !== taskId) {
       queueSave(state.current, true);
@@ -125,13 +206,104 @@
     $$("[data-task-panel]").forEach((panel) => {
       panel.classList.toggle("active", panel.dataset.taskPanel === taskId);
     });
-    const editor = document.querySelector(`[data-code="${taskId}"]`);
-    if (editor && state.fullscreenArmed) editor.focus({ preventScroll: true });
+    focusEditor(taskId);
   }
 
   function codeFor(taskId) {
-    const editor = document.querySelector(`[data-code="${taskId}"]`);
-    return editor ? editor.value : "";
+    const editor = editors.get(taskId);
+    if (editor) return editor.getValue();
+    const textarea = document.querySelector(`[data-code="${taskId}"]`);
+    return textarea ? textarea.value : "";
+  }
+
+  function focusEditor(taskId) {
+    if (!state.fullscreenArmed) return;
+    const editor = editors.get(taskId);
+    if (editor) {
+      requestAnimationFrame(() => {
+        editor.refresh();
+        editor.focus();
+      });
+      return;
+    }
+    const textarea = document.querySelector(`[data-code="${taskId}"]`);
+    if (textarea) textarea.focus({ preventScroll: true });
+  }
+
+  function updateCursor(taskId, editor) {
+    const label = document.querySelector(`[data-cursor="${taskId}"]`);
+    if (!label) return;
+    const cursor = editor.getCursor();
+    label.textContent = `${cursor.line + 1}:${cursor.ch + 1}`;
+  }
+
+  function pythonHint(editor) {
+    const cursor = editor.getCursor();
+    const before = editor.getLine(cursor.line).slice(0, cursor.ch);
+    const match = before.match(/[A-Za-z_]\w*$/);
+    if (!match) return null;
+    const word = match[0];
+    const list = PY_HINTS.filter((hint) =>
+      hint.toLowerCase().startsWith(word.toLowerCase())
+    );
+    if (!list.length) return null;
+    return {
+      list,
+      from: { line: cursor.line, ch: cursor.ch - word.length },
+      to: cursor,
+    };
+  }
+
+  function showHints(taskId) {
+    const editor = editors.get(taskId);
+    if (!editor) return;
+    editor.focus();
+    editor.showHint({ hint: pythonHint, completeSingle: false });
+  }
+
+  function setupEditors() {
+    if (!window.CodeMirror) return;
+    $$("[data-code]").forEach((textarea) => {
+      const taskId = textarea.dataset.code;
+      const editor = window.CodeMirror.fromTextArea(textarea, {
+        mode: "python",
+        theme: "exam-dark",
+        lineNumbers: true,
+        indentUnit: 4,
+        tabSize: 4,
+        indentWithTabs: false,
+        smartIndent: true,
+        autoCloseBrackets: true,
+        matchBrackets: true,
+        styleActiveLine: true,
+        lineWrapping: false,
+        scrollbarStyle: "native",
+        viewportMargin: 20,
+        extraKeys: {
+          Tab: (cm) => {
+            if (cm.somethingSelected()) cm.indentSelection("add");
+            else cm.replaceSelection("    ", "end");
+          },
+          "Shift-Tab": (cm) => cm.indentSelection("subtract"),
+          "Ctrl-Enter": () => runTask(taskId),
+          "Cmd-Enter": () => runTask(taskId),
+          "Ctrl-Space": (cm) => cm.showHint({ hint: pythonHint, completeSingle: false }),
+          "Ctrl-/": "toggleComment",
+          "Cmd-/": "toggleComment",
+          "Ctrl-F": "find",
+          "Cmd-F": "find",
+          "Ctrl-G": "findNext",
+          "Shift-Ctrl-G": "findPrev",
+        },
+      });
+      editor.on("change", () => queueSave(taskId));
+      editor.on("cursorActivity", () => updateCursor(taskId, editor));
+      const input = editor.getInputField();
+      if (input) input.setAttribute("aria-label", `Код решения ${taskId}`);
+      editors.set(taskId, editor);
+      updateCursor(taskId, editor);
+    });
+    requestAnimationFrame(() => editors.forEach((editor) => editor.refresh()));
   }
 
   function setSaveStatus(taskId, text, saving = false) {
@@ -244,15 +416,7 @@
         return;
       }
 
-      const lines = [];
-      lines.push(`Пройдено ${data.passed} из ${data.total} тестов.`);
-      if (data.error_kind && ERROR_TEXT[data.error_kind]) {
-        lines.push(ERROR_TEXT[data.error_kind]);
-      }
-      if (state.attempts[taskId] <= 0) {
-        lines.push("Попытки запуска закончились.");
-      }
-      writeResult(taskId, lines.join(" "), data.error_kind ? "bad" : "warn");
+      renderRunResult(taskId, data);
       queueSave(taskId, true);
     } catch (_) {
       writeResult(taskId, "Нет связи с сервером проверки. Попробуйте ещё раз.", "bad");
@@ -299,6 +463,18 @@
 
   async function finishExam() {
     if (!state.fullscreenArmed || state.finished) return;
+    await Promise.all(
+      cfg.tasks.map(async (task) => {
+        try {
+          await postJson(cfg.saveUrl, {
+            task_id: task.id,
+            code: codeFor(task.id),
+          });
+        } catch (_) {
+          // The last autosave is still a valid fallback.
+        }
+      })
+    );
     state.finished = true;
     state.navigating = true;
     if (finishModal) finishModal.hidden = true;
@@ -387,8 +563,7 @@
     if (fullscreenError) fullscreenError.textContent = "";
     document.querySelector(".exam-topbar")?.removeAttribute("inert");
     document.querySelector(".exam-layout")?.removeAttribute("inert");
-    const editor = document.querySelector(`[data-code="${state.current}"]`);
-    if (editor) editor.focus({ preventScroll: true });
+    focusEditor(state.current);
   }
 
   async function enterFullscreen() {
@@ -457,6 +632,10 @@
     button.addEventListener("click", () => runTask(button.dataset.run));
   });
 
+  $$("[data-hint]").forEach((button) => {
+    button.addEventListener("click", () => showHints(button.dataset.hint));
+  });
+
   const finishButton = $("#finish-button");
   if (finishButton) {
     finishButton.addEventListener("click", () => {
@@ -478,6 +657,7 @@
 
   document.querySelector(".exam-topbar")?.setAttribute("inert", "");
   document.querySelector(".exam-layout")?.setAttribute("inert", "");
+  setupEditors();
   state.current = cfg.tasks[0] ? cfg.tasks[0].id : null;
   if (state.current) activateTask(state.current);
   if (currentFullscreenElement()) {
