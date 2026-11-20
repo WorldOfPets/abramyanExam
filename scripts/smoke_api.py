@@ -103,11 +103,12 @@ def main() -> int:
         banned_config = parse_config(banned_start.text)
         banned_id = banned_config["sessionId"]
         violation = banned_client.post(
-            f"/api/exam/{banned_id}/violation", json={"reason": "tab_switch"}
+            f"/api/exam/{banned_id}/violation", json={"reason": "focus_lost"}
         )
         assert violation.status_code == 204
         banned_page = banned_client.get(f"/banned/{banned_id}")
         assert banned_page.status_code == 200 and "дисквалифицирована" in banned_page.text
+        assert "Alt+Tab" in banned_page.text
         print(f"smoke passed on attempt {attempt}")
         return 0
     print("could not get a known task in 40 attempts")
