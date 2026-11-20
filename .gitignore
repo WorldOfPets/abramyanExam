@@ -8,7 +8,9 @@ build/
 dist/
 *.spec
 exam-data/
-release/
+release/*
+!release/README.md
+!release/SHA256SUMS
 *.log
 .DS_Store
 .env

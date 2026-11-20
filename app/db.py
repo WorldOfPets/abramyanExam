@@ -7,8 +7,9 @@ import secrets
 import sqlite3
 import threading
 import time
+from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any, Iterable, Iterator
 
 from app.tasks import Task
 
@@ -102,8 +103,17 @@ class Repository:
         connection.execute("PRAGMA busy_timeout=15000")
         return connection
 
+    @contextmanager
+    def _connection(self) -> Iterator[sqlite3.Connection]:
+        connection = self._connect()
+        try:
+            with connection:
+                yield connection
+        finally:
+            connection.close()
+
     def _init_schema(self) -> None:
-        with self._connect() as connection:
+        with self._connection() as connection:
             connection.executescript(SCHEMA)
 
     # ------------------------------------------------------------------ sessions
@@ -118,7 +128,7 @@ class Repository:
         session_id = secrets.token_hex(12)
         token = secrets.token_urlsafe(32)
         task_list = list(tasks)
-        with self._lock, self._connect() as connection:
+        with self._lock, self._connection() as connection:
             connection.execute(
                 "INSERT INTO sessions (id, token_hash, student_name, started_at, deadline, "
                 "last_seen, total_tasks, client_ip) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
@@ -146,7 +156,7 @@ class Repository:
         return session_id, token
 
     def get_session(self, session_id: str) -> sqlite3.Row | None:
-        with self._connect() as connection:
+        with self._connection() as connection:
             return connection.execute(
                 "SELECT * FROM sessions WHERE id = ?", (session_id,)
             ).fetchone()
@@ -160,7 +170,7 @@ class Repository:
         return row
 
     def get_session_tasks(self, session_id: str) -> list[sqlite3.Row]:
-        with self._connect() as connection:
+        with self._connection() as connection:
             return list(
                 connection.execute(
                     "SELECT * FROM session_tasks WHERE session_id = ? ORDER BY position",
@@ -169,7 +179,7 @@ class Repository:
             )
 
     def get_session_task(self, session_id: str, task_id: str) -> sqlite3.Row | None:
-        with self._connect() as connection:
+        with self._connection() as connection:
             return connection.execute(
                 "SELECT * FROM session_tasks WHERE session_id = ? AND task_id = ?",
                 (session_id, task_id),
@@ -177,7 +187,7 @@ class Repository:
 
     def touch(self, session_id: str, at: float | None = None) -> None:
         at = now() if at is None else at
-        with self._lock, self._connect() as connection:
+        with self._lock, self._connection() as connection:
             connection.execute(
                 "UPDATE sessions SET last_seen = ? WHERE id = ? AND status = 'active'",
                 (at, session_id),
@@ -185,7 +195,7 @@ class Repository:
 
     def save_code(self, session_id: str, task_id: str, code: str, at: float | None = None) -> None:
         at = now() if at is None else at
-        with self._lock, self._connect() as connection:
+        with self._lock, self._connection() as connection:
             connection.execute(
                 "UPDATE session_tasks SET code = ?, updated_at = ? "
                 "WHERE session_id = ? AND task_id = ?",
@@ -197,7 +207,7 @@ class Repository:
             )
 
     def add_event(self, session_id: str, kind: str, detail: str | None = None) -> None:
-        with self._lock, self._connect() as connection:
+        with self._lock, self._connection() as connection:
             connection.execute(
                 "INSERT INTO events (session_id, kind, detail, created_at) VALUES (?, ?, ?, ?)",
                 (session_id, kind, detail, now()),
@@ -216,7 +226,7 @@ class Repository:
         Returns ``(attempt_number, error)``. The attempt is consumed even if the
         submitted program later crashes or times out.
         """
-        with self._lock, self._connect() as connection:
+        with self._lock, self._connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
             session = connection.execute(
                 "SELECT status, deadline FROM sessions WHERE id = ?", (session_id,)
@@ -269,7 +279,7 @@ class Repository:
         at: float | None = None,
     ) -> None:
         at = now() if at is None else at
-        with self._lock, self._connect() as connection:
+        with self._lock, self._connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
             connection.execute(
                 "INSERT INTO runs (session_id, task_id, attempt, passed, total, error_kind, "
@@ -292,7 +302,7 @@ class Repository:
 
     def finish_session(self, session_id: str, reason: str, at: float | None = None) -> None:
         at = now() if at is None else at
-        with self._lock, self._connect() as connection:
+        with self._lock, self._connection() as connection:
             connection.execute(
                 "UPDATE sessions SET status = 'finished', finished_at = ?, finish_reason = ?, "
                 "score = (SELECT COUNT(*) FROM session_tasks WHERE session_id = ? AND solved = 1) "
@@ -302,7 +312,7 @@ class Repository:
 
     def ban_session(self, session_id: str, reason: str, at: float | None = None) -> None:
         at = now() if at is None else at
-        with self._lock, self._connect() as connection:
+        with self._lock, self._connection() as connection:
             connection.execute(
                 "UPDATE sessions SET status = 'banned', banned_at = ?, ban_reason = ?, "
                 "finished_at = ?, finish_reason = 'banned', "
@@ -317,7 +327,7 @@ class Repository:
 
     # ------------------------------------------------------------------ sweep/results
     def sweep(self, at: float, grace_seconds: float) -> None:
-        with self._lock, self._connect() as connection:
+        with self._lock, self._connection() as connection:
             expired = list(
                 connection.execute(
                     "SELECT id FROM sessions WHERE status = 'active' AND deadline <= ?", (at,)
@@ -337,7 +347,7 @@ class Repository:
             self.ban_session(row["id"], "browser_closed", at)
 
     def list_sessions(self, limit: int = 500) -> list[sqlite3.Row]:
-        with self._connect() as connection:
+        with self._connection() as connection:
             return list(
                 connection.execute(
                     "SELECT * FROM sessions ORDER BY started_at DESC LIMIT ?", (limit,)
@@ -348,7 +358,7 @@ class Repository:
         if not session_ids:
             return {}
         placeholders = ",".join("?" for _ in session_ids)
-        with self._connect() as connection:
+        with self._connection() as connection:
             rows = list(
                 connection.execute(
                     f"SELECT * FROM session_tasks WHERE session_id IN ({placeholders}) "
@@ -362,7 +372,7 @@ class Repository:
         return result
 
     def count_runs(self, session_id: str) -> int:
-        with self._connect() as connection:
+        with self._connection() as connection:
             row = connection.execute(
                 "SELECT COUNT(*) AS n FROM runs WHERE session_id = ?", (session_id,)
             ).fetchone()

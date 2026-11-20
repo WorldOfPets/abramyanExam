@@ -11,7 +11,6 @@ import time
 import webbrowser
 from contextlib import asynccontextmanager
 from datetime import datetime
-from pathlib import Path
 from typing import Any, AsyncIterator
 
 import uvicorn
@@ -23,7 +22,7 @@ from pydantic import BaseModel, Field
 
 from app.config import Settings
 from app.db import Repository
-from app.exam import build_exam_view, build_result_view, public_task, start_exam
+from app.exam import build_exam_view, build_result_view, start_exam
 from app.executor import run_tests
 from app.paths import resource_path
 from app.tasks import tasks_by_id
@@ -60,6 +59,13 @@ def _format_ts(value: float | None) -> str:
     if not value:
         return "—"
     return datetime.fromtimestamp(value).strftime("%d.%m.%Y %H:%M:%S")
+
+
+def _csv_safe(value: object) -> object:
+    text = str(value)
+    if text.startswith(("=", "+", "-", "@")):
+        return "'" + text
+    return value
 
 
 templates.env.filters["ts"] = _format_ts
@@ -174,6 +180,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["Referrer-Policy"] = "no-referrer"
         response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; script-src 'self'; style-src 'self'; "
+            "img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; "
+            "base-uri 'self'; form-action 'self'"
+        )
         return response
 
     @application.get("/health")
@@ -498,7 +509,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         for session in sessions:
             row = [
                 session["id"],
-                session["student_name"],
+                _csv_safe(session["student_name"]),
                 _format_ts(session["started_at"]),
                 _format_ts(session["finished_at"]),
                 STATUS_LABELS.get(session["status"], session["status"]),
@@ -528,6 +539,9 @@ def run() -> None:
         host=settings.host,
         port=settings.port,
         log_level=settings.log_level,
+        loop="asyncio",
+        http="h11",
+        ws="none",
     )
 
 

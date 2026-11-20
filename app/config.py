@@ -64,9 +64,13 @@ class Settings:
     heartbeat_grace_seconds: float = 35.0
     max_code_chars: int = 20_000
     max_output_chars: int = 65_536
-    teacher_token: str = field(default_factory=lambda: _load_teacher_token(_default_data_dir()))
+    teacher_token: str = ""
     open_browser: bool = field(default_factory=lambda: _bool_env("EXAM_OPEN_BROWSER", getattr(sys, "frozen", False)))
     log_level: str = "info"
+
+    def __post_init__(self) -> None:
+        if not self.teacher_token:
+            object.__setattr__(self, "teacher_token", _load_teacher_token(self.data_dir))
 
     @property
     def db_path(self) -> Path:

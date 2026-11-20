@@ -88,16 +88,14 @@
     const count = Object.values(state.solved).filter(Boolean).length;
     solvedCounter.textContent = `${count} / ${cfg.totalTasks}`;
     updateRunButton(taskId);
-    if (count === cfg.totalTasks && !state.finished) {
-      showAllSolved();
-    }
   }
 
   function showAllSolved() {
+    if (document.querySelector(".all-solved")) return;
     const currentPanel = document.querySelector(`[data-task-panel="${state.current}"] [data-result="${state.current}"]`);
     if (!currentPanel) return;
     const line = document.createElement("div");
-    line.className = "result-line ok";
+    line.className = "result-line ok all-solved";
     line.textContent = "Все пять задач решены. Можно завершать экзамен.";
     currentPanel.appendChild(line);
   }
@@ -235,6 +233,9 @@
       if (data.solved) {
         setSolved(taskId, true);
         writeResult(taskId, `Задача решена: ${data.passed} из ${data.total} тестов.`, "ok");
+        if (Object.values(state.solved).filter(Boolean).length === cfg.totalTasks) {
+          showAllSolved();
+        }
         queueSave(taskId, true);
         return;
       }
