@@ -189,7 +189,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @application.middleware("http")
     async def security_headers(request: Request, call_next):  # type: ignore[no-untyped-def]
         response = await call_next(request)
-        if not request.url.path.startswith("/static"):
+        if request.url.path.startswith("/static"):
+            # Revalidate editor/JS assets after an in-place binary update.
+            response.headers["Cache-Control"] = "no-cache, max-age=0"
+        else:
             response.headers["Cache-Control"] = "no-store, max-age=0"
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["Referrer-Policy"] = "no-referrer"
