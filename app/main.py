@@ -415,6 +415,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 "view": view,
                 "student_name": session["student_name"],
                 "finish_reason": session["finish_reason"],
+                "attempts_per_task": settings.attempts_per_task,
             },
         )
 

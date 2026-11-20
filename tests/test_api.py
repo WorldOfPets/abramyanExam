@@ -72,7 +72,7 @@ def test_exam_page_has_five_tasks_without_hidden_tests(client: TestClient) -> No
     assert "Скрытые тесты" not in page.text
     assert '"tests"' not in page.text
     first_code = tasks_by_id()[config["tasks"][0]["id"]].code
-    assert f"# {first_code}." in page.text
+    assert f"# {first_code}" in page.text
 
 
 def test_state_and_save(client: TestClient) -> None:

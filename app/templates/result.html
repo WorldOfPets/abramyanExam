@@ -50,7 +50,7 @@
               {% endif %}
             </td>
             <td>{{ row.best_passed }} / {{ row.total_tests }}</td>
-            <td>{{ row.attempts_used }} / 10</td>
+            <td>{{ row.attempts_used }} / {{ attempts_per_task }}</td>
           </tr>
         {% endfor %}
       </tbody>

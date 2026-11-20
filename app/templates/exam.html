@@ -42,7 +42,7 @@
     </nav>
     <div class="sidebar-note">
       <span class="dot"></span>
-      10 попыток на каждую задачу
+      {{ view.attempts_per_task }} попыток на каждую задачу
     </div>
   </aside>
 
@@ -93,7 +93,8 @@
             <textarea class="code-editor" data-code="{{ task.id }}" spellcheck="false"
                       autocomplete="off" autocapitalize="off" wrap="off"
                       maxlength="20000"
-                      aria-label="Код решения {{ task.code }}">{% if task.saved_code %}{{ task.saved_code }}{% else %}# {{ task.code }}. Читайте данные через input(), выводите через print(){% endif %}</textarea>
+                      aria-label="Код решения {{ task.code }}">{% if task.saved_code %}{{ task.saved_code }}{% else %}# {{ task.code }}
+# Читайте данные через input(), выводите ответ через print(){% endif %}</textarea>
             <div class="editor-actions">
               <button class="btn run-button" type="button" data-run="{{ task.id }}"
                       {% if task.solved %}disabled{% endif %}>
