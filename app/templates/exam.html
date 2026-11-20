@@ -92,7 +92,7 @@
             </div>
             <textarea class="code-editor" data-code="{{ task.id }}" spellcheck="false"
                       autocomplete="off" autocapitalize="off" wrap="off"
-                      maxlength="20000"
+                      maxlength="{{ config.maxCodeChars }}"
                       aria-label="Код решения {{ task.code }}">{% if task.saved_code %}{{ task.saved_code }}{% else %}# {{ task.code }}
 # Читайте данные через input(), выводите ответ через print(){% endif %}</textarea>
             <div class="editor-actions">

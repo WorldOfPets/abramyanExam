@@ -51,7 +51,8 @@ chmod +x abramyan-exam
 Проверка собранного файла без открытия браузера:
 
 ```bash
-bash scripts/smoke_linux.sh
+bash scripts/smoke_linux.sh       # health, стартовая страница, панель учителя
+bash scripts/smoke_artifact.sh    # полный цикл: код, 8 тестов, таймаут, бан
 ```
 
 ### Переменные окружения

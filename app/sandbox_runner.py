@@ -135,7 +135,7 @@ def check_ast(tree: ast.AST) -> None:
             if node.module not in ALLOWED_IMPORTS:
                 raise PermissionError(f"import from {node.module} is not allowed")
         elif isinstance(node, ast.Name):
-            if node.id.startswith("__") or node.id in FORBIDDEN_NAMES:
+            if (node.id.startswith("__") and node.id != "__name__") or node.id in FORBIDDEN_NAMES:
                 raise PermissionError(f"name {node.id} is not allowed")
         elif isinstance(node, ast.Attribute):
             if node.attr.startswith("__"):
@@ -175,7 +175,7 @@ def build_globals(data: str) -> dict[str, object]:
     safe["__import__"] = lambda name, *args, **kwargs: (
         math if name == "math" else (_ for _ in ()).throw(PermissionError(f"import {name} is not allowed"))
     )
-    return {"__builtins__": safe, "__name__": "__student__"}
+    return {"__builtins__": safe, "__name__": "__main__"}
 
 
 def main() -> int:

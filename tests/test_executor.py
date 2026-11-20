@@ -81,3 +81,16 @@ def test_output_limit(settings: Settings) -> None:
 def test_empty_stdin_is_eof(settings: Settings) -> None:
     result = execute_code("print(input())", "", settings)
     assert result.returncode != 0
+
+
+def test_main_guard_is_allowed(settings: Settings) -> None:
+    task = tasks_by_id()["integer-01"]
+    code = (
+        "def main():\n"
+        "    l = int(input())\n"
+        "    print(l // 100)\n"
+        "\n"
+        "if __name__ == '__main__':\n"
+        "    main()\n"
+    )
+    assert run_tests(code, task.tests, settings).solved

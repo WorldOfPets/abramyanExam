@@ -55,6 +55,10 @@ REASON_LABELS = {
 }
 
 
+def _public_host(host: str) -> str:
+    return "127.0.0.1" if host in {"0.0.0.0", "::"} else host
+
+
 def _format_ts(value: float | None) -> str:
     if not value:
         return "—"
@@ -154,8 +158,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     pass
 
         task = asyncio.create_task(sweeper())
-        print(f"Экзамен:          http://{settings.host}:{settings.port}/")
-        print(f"Преподаватель:    http://{settings.host}:{settings.port}/teacher?token={settings.teacher_token}")
+        public_host = _public_host(settings.host)
+        print(f"Экзамен:          http://{public_host}:{settings.port}/")
+        print(f"Преподаватель:    http://{public_host}:{settings.port}/teacher?token={settings.teacher_token}")
         print(f"Данные:           {settings.data_dir}")
         try:
             yield
@@ -532,7 +537,7 @@ app = create_app()
 
 def run() -> None:
     settings: Settings = app.state.settings
-    url = f"http://{settings.host}:{settings.port}/"
+    url = f"http://{_public_host(settings.host)}:{settings.port}/"
     if settings.open_browser:
         threading.Timer(1.2, lambda: webbrowser.open(url)).start()
     uvicorn.run(
