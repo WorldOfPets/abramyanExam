@@ -9,6 +9,7 @@
     finished: false,
     navigating: false,
     banSent: false,
+    fullscreenArmed: false,
     deadline: Date.now() + cfg.remainingSeconds * 1000,
     current: null,
     solved: {},
@@ -31,6 +32,9 @@
   const timerStat = $("#timer-stat");
   const solvedCounter = $("#solved-counter");
   const finishModal = $("#finish-modal");
+  const fullscreenGate = $("#fullscreen-gate");
+  const fullscreenButton = $("#enter-fullscreen");
+  const fullscreenError = $("#fullscreen-error");
 
   const ERROR_TEXT = {
     timeout: "Превышено время выполнения.",
@@ -122,7 +126,7 @@
       panel.classList.toggle("active", panel.dataset.taskPanel === taskId);
     });
     const editor = document.querySelector(`[data-code="${taskId}"]`);
-    if (editor) editor.focus({ preventScroll: true });
+    if (editor && state.fullscreenArmed) editor.focus({ preventScroll: true });
   }
 
   function codeFor(taskId) {
@@ -190,7 +194,7 @@
   }
 
   async function runTask(taskId) {
-    if (state.finished || state.solved[taskId] || state.attempts[taskId] <= 0) return;
+    if (!state.fullscreenArmed || state.finished || state.solved[taskId] || state.attempts[taskId] <= 0) return;
     const code = codeFor(taskId);
     if (!code.trim()) {
       writeResult(taskId, "Сначала напишите решение.", "warn");
@@ -294,7 +298,7 @@
   }
 
   async function finishExam() {
-    if (state.finished) return;
+    if (!state.fullscreenArmed || state.finished) return;
     state.finished = true;
     state.navigating = true;
     if (finishModal) finishModal.hidden = true;
@@ -367,6 +371,65 @@
     }
   }
 
+  // ---------------------------------------------------------------- fullscreen
+  function currentFullscreenElement() {
+    return document.fullscreenElement || document.webkitFullscreenElement || null;
+  }
+
+  function fullscreenRequest() {
+    const root = document.documentElement;
+    return root.requestFullscreen || root.webkitRequestFullscreen || null;
+  }
+
+  function armFullscreen() {
+    state.fullscreenArmed = true;
+    if (fullscreenGate) fullscreenGate.hidden = true;
+    if (fullscreenError) fullscreenError.textContent = "";
+    document.querySelector(".exam-topbar")?.removeAttribute("inert");
+    document.querySelector(".exam-layout")?.removeAttribute("inert");
+    const editor = document.querySelector(`[data-code="${state.current}"]`);
+    if (editor) editor.focus({ preventScroll: true });
+  }
+
+  async function enterFullscreen() {
+    const request = fullscreenRequest();
+    if (!request || document.fullscreenEnabled === false) {
+      if (fullscreenError) {
+        fullscreenError.textContent = "Этот браузер не поддерживает полноэкранный режим. Откройте экзамен в актуальном Chrome, Edge или Firefox.";
+      }
+      return;
+    }
+    if (fullscreenError) fullscreenError.textContent = "";
+    fullscreenButton.disabled = true;
+    try {
+      const attempt = request.call(document.documentElement);
+      await Promise.race([
+        attempt && typeof attempt.then === "function" ? attempt : Promise.resolve(),
+        new Promise((resolve) => setTimeout(resolve, 1500)),
+      ]);
+      if (currentFullscreenElement()) {
+        armFullscreen();
+      } else if (fullscreenError) {
+        fullscreenError.textContent = "Не удалось войти в полноэкранный режим. Разрешите его в браузере и нажмите кнопку ещё раз.";
+      }
+    } catch (_) {
+      if (fullscreenError) {
+        fullscreenError.textContent = "Браузер не разрешил полноэкранный режим. Разрешите его и нажмите кнопку ещё раз.";
+      }
+    } finally {
+      fullscreenButton.disabled = false;
+    }
+  }
+
+  function handleFullscreenChange() {
+    if (currentFullscreenElement()) {
+      armFullscreen();
+      return;
+    }
+    if (!state.fullscreenArmed || state.finished || state.navigating || state.banSent) return;
+    sendViolation("fullscreen_exit");
+  }
+
   // ---------------------------------------------------------------- wiring
   $$("[data-task-tab]").forEach((tab) => {
     tab.addEventListener("click", () => activateTask(tab.dataset.taskTab));
@@ -407,11 +470,23 @@
   $("#confirm-finish").addEventListener("click", finishExam);
 
   document.addEventListener("visibilitychange", handleVisibility);
+  document.addEventListener("fullscreenchange", handleFullscreenChange);
+  document.addEventListener("webkitfullscreenchange", handleFullscreenChange);
   window.addEventListener("pagehide", handlePageHide);
   window.addEventListener("focus", syncState);
+  if (fullscreenButton) fullscreenButton.addEventListener("click", enterFullscreen);
 
+  document.querySelector(".exam-topbar")?.setAttribute("inert", "");
+  document.querySelector(".exam-layout")?.setAttribute("inert", "");
   state.current = cfg.tasks[0] ? cfg.tasks[0].id : null;
   if (state.current) activateTask(state.current);
+  if (currentFullscreenElement()) {
+    armFullscreen();
+  } else if (!fullscreenRequest() || document.fullscreenEnabled === false) {
+    if (fullscreenError) {
+      fullscreenError.textContent = "Этот браузер не поддерживает полноэкранный режим. Откройте экзамен в актуальном Chrome, Edge или Firefox.";
+    }
+  }
   tick();
   setInterval(tick, 250);
   syncState();

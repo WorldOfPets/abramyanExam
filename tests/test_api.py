@@ -71,6 +71,8 @@ def test_exam_page_has_five_tasks_without_hidden_tests(client: TestClient) -> No
     assert page.status_code == 200
     assert "Скрытые тесты" not in page.text
     assert '"tests"' not in page.text
+    assert 'id="fullscreen-gate"' in page.text
+    assert 'id="enter-fullscreen"' in page.text
     first_code = tasks_by_id()[config["tasks"][0]["id"]].code
     assert f"# {first_code}" in page.text
 
@@ -152,6 +154,17 @@ def test_violation_bans_session(client: TestClient) -> None:
     assert "дисквалифицирована" in page.text
     state = client.get(f"/api/exam/{session_id}/state").json()
     assert state["status"] == "banned"
+
+
+def test_fullscreen_exit_bans_session(client: TestClient) -> None:
+    session_id, _ = _start(client)
+    response = client.post(
+        f"/api/exam/{session_id}/violation", json={"reason": "fullscreen_exit"}
+    )
+    assert response.status_code == 204
+    page = client.get(f"/banned/{session_id}")
+    assert page.status_code == 200
+    assert "полноэкранного режима" in page.text
 
 
 def test_finish_and_result(client: TestClient) -> None:

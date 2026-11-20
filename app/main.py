@@ -58,6 +58,7 @@ REASON_LABELS = {
     "page_closed": "закрытие или уход со страницы",
     "browser_closed": "потеря связи с браузером",
     "heartbeat_lost": "потеря связи с браузером",
+    "fullscreen_exit": "выход из полноэкранного режима",
 }
 
 
@@ -405,7 +406,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 reason = payload.reason
         except (ValueError, TypeError):
             reason = "tab_switch"
-        if reason not in {"tab_switch", "page_closed", "browser_closed", "heartbeat_lost"}:
+        if reason not in {
+            "tab_switch",
+            "page_closed",
+            "browser_closed",
+            "heartbeat_lost",
+            "fullscreen_exit",
+        }:
             reason = "tab_switch"
         repo.ban_session(session_id, reason)
         return Response(status_code=204)
