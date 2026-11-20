@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block body_class %}result-body{% endblock %}
+{% block content %}
+<main class="result-wrap">
+  <header class="brandline">
+    <div class="brand">
+      <span class="brand-mark">А</span>
+      <span>Абрамян · 1000 задач</span>
+    </div>
+    <span class="brand-note">Результат</span>
+  </header>
+
+  <section class="result-hero">
+    <div>
+      <p class="eyebrow">Экзамен завершён</p>
+      <h1>{{ student_name }}</h1>
+      {% if finish_reason == "timeout" %}
+        <p class="lead">Время вышло — работа завершена автоматически.</p>
+      {% else %}
+        <p class="lead">Работа сдана. Ниже — результат автопроверки по скрытым тестам.</p>
+      {% endif %}
+    </div>
+    <div class="score-badge">
+      <b>{{ view.solved_count }}<span>/{{ view.total }}</span></b>
+      <small>задач решено</small>
+    </div>
+  </section>
+
+  <section class="result-table-card">
+    <table class="result-table">
+      <thead>
+        <tr>
+          <th>Задача</th>
+          <th>Блок</th>
+          <th>Статус</th>
+          <th>Тесты</th>
+          <th>Попытки</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in view.rows %}
+          <tr>
+            <td><b>{{ row.task.code }}</b> · {{ row.task.title }}</td>
+            <td>{{ row.task.block_title }}</td>
+            <td>
+              {% if row.solved %}
+                <span class="chip ok">решена</span>
+              {% else %}
+                <span class="chip">не решена</span>
+              {% endif %}
+            </td>
+            <td>{{ row.best_passed }} / {{ row.total_tests }}</td>
+            <td>{{ row.attempts_used }} / 10</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+
+  <p class="tiny">Результат сохранён на этом компьютере. Преподаватель может выгрузить общую таблицу.</p>
+</main>
+{% endblock %}

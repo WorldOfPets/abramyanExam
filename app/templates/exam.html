@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+{% block body_class %}exam-body{% endblock %}
+{% block content %}
+<header class="exam-topbar">
+  <div class="exam-brand">
+    <span class="brand-mark">А</span>
+    <div>
+      <strong>Экзамен</strong>
+      <span>{{ student_name }}</span>
+    </div>
+  </div>
+  <div class="exam-stats">
+    <div class="stat">
+      <span>Решено</span>
+      <b id="solved-counter">{{ view.solved_count }} / {{ view.tasks|length }}</b>
+    </div>
+    <div class="stat timer-stat" id="timer-stat">
+      <span>Осталось</span>
+      <b id="timer" aria-live="polite">{{ "%02d:%02d"|format(view.remaining_seconds // 60, view.remaining_seconds % 60) }}</b>
+    </div>
+    <button class="btn btn-ghost" id="finish-button" type="button">Завершить</button>
+  </div>
+</header>
+
+<div class="exam-layout">
+  <aside class="task-sidebar" aria-label="Задачи">
+    <p class="sidebar-label">Билет</p>
+    <nav class="task-nav">
+      {% for task in view.tasks %}
+        <button class="task-tab {% if loop.first %}active{% endif %}" type="button"
+                data-task-tab="{{ task.id }}" aria-controls="panel-{{ task.id }}">
+          <span class="task-icon">{{ task.icon }}</span>
+          <span class="task-tab-copy">
+            <b>{{ task.code }}</b>
+            <small>{{ task.block_title }}</small>
+          </span>
+          <span class="task-state {% if task.solved %}solved{% endif %}"
+                data-task-state="{{ task.id }}"
+                title="{% if task.solved %}Решена{% else %}Не решена{% endif %}"></span>
+        </button>
+      {% endfor %}
+    </nav>
+    <div class="sidebar-note">
+      <span class="dot"></span>
+      10 попыток на каждую задачу
+    </div>
+  </aside>
+
+  <main class="workspace">
+    {% for task in view.tasks %}
+      <article class="task-panel {% if loop.first %}active{% endif %}" id="panel-{{ task.id }}"
+               data-task-panel="{{ task.id }}" data-solved="{{ '1' if task.solved else '0' }}">
+        <header class="task-head">
+          <div>
+            <p class="eyebrow">{{ task.code }} · {{ task.block_title }}</p>
+            <h2>{{ task.title }}</h2>
+          </div>
+          <div class="attempt-badge" data-attempts="{{ task.id }}">
+            Попыток: <b>{{ task.attempts_left }}</b>
+          </div>
+        </header>
+
+        <div class="task-content">
+          <section class="statement-block">
+            <div class="statement">{{ task.statement }}</div>
+            <div class="io-grid">
+              <div class="io-card">
+                <span>Формат ввода</span>
+                <p>{{ task.input_format }}</p>
+              </div>
+              <div class="io-card">
+                <span>Формат вывода</span>
+                <p>{{ task.output_format }}</p>
+              </div>
+            </div>
+            <div class="sample-grid">
+              <div class="sample">
+                <span>Пример ввода</span>
+                <pre>{{ task.sample_input }}</pre>
+              </div>
+              <div class="sample">
+                <span>Пример вывода</span>
+                <pre>{{ task.sample_output }}</pre>
+              </div>
+            </div>
+          </section>
+
+          <section class="editor-block">
+            <div class="editor-head">
+              <span>Решение на Python</span>
+              <span class="save-status" data-save-status="{{ task.id }}">сохранено</span>
+            </div>
+            <textarea class="code-editor" data-code="{{ task.id }}" spellcheck="false"
+                      autocomplete="off" autocapitalize="off" wrap="off"
+                      maxlength="20000"
+                      aria-label="Код решения {{ task.code }}">{% if task.saved_code %}{{ task.saved_code }}{% else %}# {{ task.code }}. Читайте данные через input(), выводите через print(){% endif %}</textarea>
+            <div class="editor-actions">
+              <button class="btn run-button" type="button" data-run="{{ task.id }}"
+                      {% if task.solved %}disabled{% endif %}>
+                {% if task.solved %}Задача решена{% else %}Запустить код{% endif %}
+              </button>
+              <span class="hint">Ctrl + Enter — запустить</span>
+            </div>
+            <div class="run-result" data-result="{{ task.id }}" role="status" aria-live="polite">
+              {% if task.solved %}
+                <div class="result-line ok">Задача решена: {{ task.best_passed }} из {{ task.total_tests }} тестов.</div>
+              {% endif %}
+            </div>
+          </section>
+        </div>
+      </article>
+    {% endfor %}
+  </main>
+</div>
+
+<div class="modal" id="finish-modal" hidden>
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="finish-title">
+    <h2 id="finish-title">Завершить экзамен?</h2>
+    <p>После завершения изменить ответы и запустить код будет нельзя. Результат появится сразу.</p>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" type="button" id="cancel-finish">Продолжить</button>
+      <button class="btn btn-danger" type="button" id="confirm-finish">Завершить</button>
+    </div>
+  </div>
+</div>
+
+<script type="application/json" id="exam-config">{{ config|tojson }}</script>
+{% endblock %}
+{% block scripts %}
+<script src="/static/exam.js" defer></script>
+{% endblock %}

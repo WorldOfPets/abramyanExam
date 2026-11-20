@@ -80,7 +80,7 @@ def build_exam_view(
                 "attempts_left": max(0, settings.attempts_per_task - row["attempts_used"]),
                 "best_passed": row["best_passed"],
                 "solved": bool(row["solved"]),
-                "code": row["code"],
+                "saved_code": row["code"],
                 "icon": BLOCK_ICONS.get(task.block, "•"),
             }
         )

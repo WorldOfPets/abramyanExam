@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block body_class %}banned-body{% endblock %}
+{% block content %}
+<main class="banned-wrap">
+  <header class="brandline">
+    <div class="brand">
+      <span class="brand-mark">А</span>
+      <span>Абрамян · 1000 задач</span>
+    </div>
+    <span class="brand-note">Античит</span>
+  </header>
+
+  <section class="banned-card">
+    <p class="eyebrow">Экзамен аннулирован</p>
+    <h1>Попытка дисквалифицирована</h1>
+    <p class="lead">
+      Студент: <b>{{ student_name }}</b><br>
+      Причина: <b>{{ reason }}</b>
+    </p>
+    <p>
+      По правилам экзамена смена вкладки, закрытие браузера или уход со страницы
+      во время попытки приводят к мгновенному бану. Эта попытка больше не может
+      быть продолжена или проверена.
+    </p>
+    <div class="banned-stamp">BANNED</div>
+  </section>
+</main>
+{% endblock %}

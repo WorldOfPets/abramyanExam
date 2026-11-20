@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block body_class %}teacher-body{% endblock %}
+{% block content %}
+<main class="teacher-wrap">
+  <header class="teacher-head">
+    <div>
+      <p class="eyebrow">Преподаватель</p>
+      <h1>Результаты экзамена</h1>
+      <p class="muted">Всего попыток: {{ total }}</p>
+    </div>
+    <a class="btn" href="/teacher/export.csv?token={{ token }}">Скачать CSV</a>
+  </header>
+
+  {% if rows %}
+    <section class="teacher-table-card">
+      <table class="teacher-table">
+        <thead>
+          <tr>
+            <th>Студент</th>
+            <th>Старт</th>
+            <th>Статус</th>
+            <th>Балл</th>
+            <th>Задачи</th>
+            <th>Причина</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in rows %}
+            <tr>
+              <td><b>{{ row.session.student_name }}</b><br><small>{{ row.session.id }}</small></td>
+              <td>{{ row.session.started_at|ts }}</td>
+              <td>
+                <span class="chip {% if row.session.status == 'finished' %}ok{% elif row.session.status == 'banned' %}bad{% endif %}">
+                  {{ row.status_label }}
+                </span>
+              </td>
+              <td><b>{{ row.session.score }}</b> / {{ row.session.total_tasks }}</td>
+              <td>
+                <div class="mini-tasks">
+                  {% for task in row.tasks %}
+                    <span class="mini-task {% if task.solved %}solved{% endif %}" title="{{ task.title }}">
+                      {{ task.code }} · {{ task.best_passed }}/{{ task.total_tests }}
+                    </span>
+                  {% endfor %}
+                </div>
+              </td>
+              <td>{% if row.session.status == 'banned' %}{{ row.reason }}{% else %}—{% endif %}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+  {% else %}
+    <section class="empty-card">Пока никто не начинал экзамен.</section>
+  {% endif %}
+</main>
+{% endblock %}
