@@ -581,6 +581,7 @@
 
   function handleWindowBlur() {
     if (!state.fullscreenArmed || state.finished || state.navigating || state.banSent) return;
+    if (Date.now() - state.focusArmedAt < 1200) return;
     sendViolation("focus_lost");
   }
 
