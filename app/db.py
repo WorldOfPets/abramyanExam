@@ -7,9 +7,10 @@ import secrets
 import sqlite3
 import threading
 import time
+from collections.abc import Iterable, Iterator
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Iterable, Iterator
+from typing import Any
 
 from app.tasks import Task
 
@@ -380,4 +381,4 @@ class Repository:
 
 
 def row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
-    return {key: row[key] for key in row.keys()}
+    return {key: row[key] for key in row}

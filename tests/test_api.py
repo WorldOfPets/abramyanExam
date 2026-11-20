@@ -45,7 +45,7 @@ def _start(client: TestClient, name: str = "Анна Петрова") -> tuple[s
     assert location.startswith("/exam/")
     page = client.get(location)
     assert page.status_code == 200
-    match = re.search(r'id="exam-config">(.*?)</script>', page.text, re.S)
+    match = re.search(r'id="exam-config">(.*?)</script>', page.text, re.DOTALL)
     assert match
     return location.rsplit("/", 1)[-1], json.loads(match.group(1))
 

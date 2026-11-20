@@ -3,15 +3,14 @@
 from __future__ import annotations
 
 import os
-import shutil
 import signal
 import subprocess
 import sys
 import tempfile
 import time
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable
 
 from app.config import Settings
 from app.grading import compare_output

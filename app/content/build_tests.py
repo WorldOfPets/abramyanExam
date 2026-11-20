@@ -9,9 +9,8 @@ from __future__ import annotations
 
 import json
 import math
-import random
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
 
 OUT = Path(__file__).with_name("tasks.json")
 
@@ -612,7 +611,7 @@ def solve_series_7(raw: str) -> str:
     values = as_floats(raw)
     n = int(values[0])
     data = values[1 : n + 1]
-    rounded = [int(round(x)) for x in data]
+    rounded = [round(x) for x in data]
     return lines([*rounded, sum(rounded)])
 
 

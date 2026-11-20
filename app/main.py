@@ -9,13 +9,19 @@ import secrets
 import threading
 import time
 import webbrowser
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from datetime import datetime
-from typing import Any, AsyncIterator
+from typing import Any
 
 import uvicorn
 from fastapi import FastAPI, HTTPException, Request, Response, status
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
+from fastapi.responses import (
+    HTMLResponse,
+    JSONResponse,
+    RedirectResponse,
+    StreamingResponse,
+)
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
@@ -150,11 +156,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     await asyncio.to_thread(
                         repo.sweep, time.time(), settings.heartbeat_grace_seconds
                     )
-                except Exception:
+                except Exception:  # noqa: BLE001, S110 - keep the sweep loop alive
                     pass
                 try:
                     await asyncio.wait_for(stop.wait(), timeout=2.0)
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     pass
 
         task = asyncio.create_task(sweeper())
@@ -397,8 +403,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             if raw:
                 payload = ViolationPayload.model_validate_json(raw)
                 reason = payload.reason
-        except Exception:
-            pass
+        except (ValueError, TypeError):
+            reason = "tab_switch"
         if reason not in {"tab_switch", "page_closed", "browser_closed", "heartbeat_lost"}:
             reason = "tab_switch"
         repo.ban_session(session_id, reason)

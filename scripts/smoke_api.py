@@ -38,7 +38,7 @@ KNOWN = {
 
 
 def parse_config(html: str) -> dict:
-    match = re.search(r'id="exam-config">(.*?)</script>', html, re.S)
+    match = re.search(r'id="exam-config">(.*?)</script>', html, re.DOTALL)
     if not match:
         raise RuntimeError("exam config not found")
     return json.loads(match.group(1))

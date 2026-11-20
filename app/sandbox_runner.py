@@ -137,9 +137,8 @@ def check_ast(tree: ast.AST) -> None:
         elif isinstance(node, ast.Name):
             if (node.id.startswith("__") and node.id != "__name__") or node.id in FORBIDDEN_NAMES:
                 raise PermissionError(f"name {node.id} is not allowed")
-        elif isinstance(node, ast.Attribute):
-            if node.attr.startswith("__"):
-                raise PermissionError("dunder attributes are not allowed")
+        elif isinstance(node, ast.Attribute) and node.attr.startswith("__"):
+            raise PermissionError("dunder attributes are not allowed")
 
 
 def apply_limits() -> None:
@@ -184,8 +183,10 @@ def main() -> int:
         return 64
     code_path, input_path = sys.argv[1], sys.argv[2]
     try:
-        code = open(code_path, encoding="utf-8").read()
-        data = open(input_path, encoding="utf-8").read()
+        with open(code_path, encoding="utf-8") as handle:
+            code = handle.read()
+        with open(input_path, encoding="utf-8") as handle:
+            data = handle.read()
     except OSError as exc:
         print(f"cannot read submission: {exc}", file=sys.stderr)
         return 66
@@ -204,17 +205,17 @@ def main() -> int:
     sys.stderr = io.StringIO()
     apply_limits()
     try:
-        exec(compiled, build_globals(data))
+        exec(compiled, build_globals(data))  # noqa: S102 - sandboxed namespace
     except OutputLimitError:
         print("output limit exceeded", file=real_stderr)
         return 67
-    except BaseException:
+    except BaseException:  # noqa: BLE001 - report any student failure as runtime error
         traceback.print_exc(file=real_stderr)
         return 70
     finally:
         try:
             stdout.flush()
-        except Exception:
+        except Exception:  # noqa: BLE001, S110 - flushing must never mask the result
             pass
     return 0
 

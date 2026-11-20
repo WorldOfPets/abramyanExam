@@ -81,7 +81,7 @@ class Settings:
         return self.exam_minutes * 60
 
     @classmethod
-    def from_env(cls) -> "Settings":
+    def from_env(cls) -> Settings:
         data_dir = Path(os.environ.get("EXAM_DATA_DIR") or _default_data_dir()).expanduser().resolve()
         data_dir.mkdir(parents=True, exist_ok=True)
         return cls(
