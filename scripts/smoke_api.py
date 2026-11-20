@@ -72,6 +72,26 @@ def main() -> int:
         result = client.get(f"/result/{config['sessionId']}")
         assert result.status_code == 200 and "задач решено" in result.text
 
+        bad_client = httpx.Client(base_url=BASE, follow_redirects=True, timeout=30)
+        bad_start = bad_client.post("/start", data={"name": "Sandbox Test", "consent": "yes"})
+        bad_config = parse_config(bad_start.text)
+        bad_id = bad_config["sessionId"]
+        first_id = bad_config["tasks"][0]["id"]
+        second_id = bad_config["tasks"][1]["id"]
+        timeout_run = bad_client.post(
+            f"/api/exam/{bad_id}/run",
+            json={"task_id": first_id, "code": "while True:\n    pass\n"},
+        )
+        assert timeout_run.status_code == 200, timeout_run.text
+        assert timeout_run.json()["error_kind"] == "timeout", timeout_run.json()
+        forbidden_run = bad_client.post(
+            f"/api/exam/{bad_id}/run",
+            json={"task_id": second_id, "code": "import os\nprint(1)\n"},
+        )
+        assert forbidden_run.status_code == 200, forbidden_run.text
+        assert forbidden_run.json()["error_kind"] == "not_allowed_or_syntax", forbidden_run.json()
+        print("sandbox limits passed")
+
         banned_client = httpx.Client(base_url=BASE, follow_redirects=True, timeout=30)
         banned_start = banned_client.post("/start", data={"name": "Ban Test", "consent": "yes"})
         banned_config = parse_config(banned_start.text)
