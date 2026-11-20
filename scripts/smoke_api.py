@@ -52,6 +52,8 @@ def main() -> int:
             print("start failed", start.status_code, start.text[:200])
             return 1
         config = parse_config(start.text)
+        assert 'id="fullscreen-gate"' in start.text, "fullscreen gate missing"
+        assert 'id="enter-fullscreen"' in start.text, "fullscreen button missing"
         chosen = next((task for task in config["tasks"] if task["id"] in KNOWN), None)
         if chosen is None:
             client.close()
