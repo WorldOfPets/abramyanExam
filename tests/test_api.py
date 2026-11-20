@@ -178,6 +178,17 @@ def test_fullscreen_exit_bans_session(client: TestClient) -> None:
     assert "полноэкранного режима" in page.text
 
 
+def test_focus_loss_bans_session(client: TestClient) -> None:
+    session_id, _ = _start(client)
+    response = client.post(
+        f"/api/exam/{session_id}/violation", json={"reason": "focus_lost"}
+    )
+    assert response.status_code == 204
+    page = client.get(f"/banned/{session_id}")
+    assert page.status_code == 200
+    assert "Alt+Tab" in page.text
+
+
 def test_finish_and_result(client: TestClient) -> None:
     session_id, _ = _start(client)
     response = client.post(f"/api/exam/{session_id}/finish", json={})

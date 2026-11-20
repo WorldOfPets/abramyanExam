@@ -10,6 +10,7 @@
     navigating: false,
     banSent: false,
     fullscreenArmed: false,
+    focusArmedAt: 0,
     deadline: Date.now() + cfg.remainingSeconds * 1000,
     current: null,
     solved: {},
@@ -559,11 +560,65 @@
 
   function armFullscreen() {
     state.fullscreenArmed = true;
+    state.focusArmedAt = Date.now();
     if (fullscreenGate) fullscreenGate.hidden = true;
     if (fullscreenError) fullscreenError.textContent = "";
     document.querySelector(".exam-topbar")?.removeAttribute("inert");
     document.querySelector(".exam-layout")?.removeAttribute("inert");
     focusEditor(state.current);
+    lockKeyboard();
+  }
+
+  function lockKeyboard() {
+    try {
+      if (navigator.keyboard && typeof navigator.keyboard.lock === "function") {
+        navigator.keyboard.lock().catch(() => {});
+      }
+    } catch (_) {
+      // Keyboard Lock is unavailable on insecure origins; focus-loss ban remains.
+    }
+  }
+
+  function handleWindowBlur() {
+    if (!state.fullscreenArmed || state.finished || state.navigating || state.banSent) return;
+    sendViolation("focus_lost");
+  }
+
+  function checkWindowFocus() {
+    if (!state.fullscreenArmed || state.finished || state.navigating || state.banSent) return;
+    if (Date.now() - state.focusArmedAt < 1200) return;
+    if (!document.hasFocus()) sendViolation("focus_lost");
+  }
+
+  const ALLOWED_CTRL_KEYS = new Set([
+    "a", "c", "v", "x", "z", "y", "f", "g", "space", "enter",
+    "backspace", "delete", "arrowleft", "arrowright", "home", "end", "/", ".",
+  ]);
+
+  function isBlockedShortcut(event) {
+    const key = event.key;
+    const lower = key === " " ? "space" : key.toLowerCase();
+    if (/^f\d{1,2}$/i.test(key)) return true;
+    if (key === "Meta" || key === "ContextMenu" || lower === "printscreen") return true;
+
+    if (event.altKey && !event.ctrlKey && !event.metaKey) {
+      return ["tab", "f4", "space", "enter", "arrowleft", "arrowright"].includes(lower);
+    }
+
+    if (event.ctrlKey || event.metaKey) {
+      if (event.altKey) return false; // AltGr must keep working for keyboard layouts.
+      if (event.shiftKey) {
+        return !["z", "g", "arrowleft", "arrowright", "home", "end"].includes(lower);
+      }
+      return !ALLOWED_CTRL_KEYS.has(lower);
+    }
+    return false;
+  }
+
+  function handleKeyDown(event) {
+    if (!isBlockedShortcut(event)) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
   }
 
   async function enterFullscreen() {
@@ -651,9 +706,13 @@
   document.addEventListener("visibilitychange", handleVisibility);
   document.addEventListener("fullscreenchange", handleFullscreenChange);
   document.addEventListener("webkitfullscreenchange", handleFullscreenChange);
+  document.addEventListener("keydown", handleKeyDown, true);
+  document.addEventListener("contextmenu", (event) => event.preventDefault());
+  window.addEventListener("blur", handleWindowBlur);
   window.addEventListener("pagehide", handlePageHide);
   window.addEventListener("focus", syncState);
   if (fullscreenButton) fullscreenButton.addEventListener("click", enterFullscreen);
+  setInterval(checkWindowFocus, 1000);
 
   document.querySelector(".exam-topbar")?.setAttribute("inert", "");
   document.querySelector(".exam-layout")?.setAttribute("inert", "");

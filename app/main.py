@@ -59,6 +59,7 @@ REASON_LABELS = {
     "browser_closed": "потеря связи с браузером",
     "heartbeat_lost": "потеря связи с браузером",
     "fullscreen_exit": "выход из полноэкранного режима",
+    "focus_lost": "потеря фокуса окна (Alt+Tab)",
 }
 
 
@@ -415,6 +416,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "browser_closed",
             "heartbeat_lost",
             "fullscreen_exit",
+            "focus_lost",
         }:
             reason = "tab_switch"
         repo.ban_session(session_id, reason)
