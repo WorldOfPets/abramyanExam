@@ -60,6 +60,7 @@ REASON_LABELS = {
     "heartbeat_lost": "потеря связи с браузером",
     "fullscreen_exit": "выход из полноэкранного режима",
     "focus_lost": "потеря фокуса окна (Alt+Tab)",
+    "duplicate_tab": "открыта вторая вкладка экзамена",
 }
 
 
@@ -295,6 +296,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @application.get("/api/exam/{session_id}/state")
     async def exam_state(request: Request, session_id: str) -> JSONResponse:
         session = _require_session(request, session_id)
+        tab_id = request.query_params.get("tab", "").strip()
+        if session["status"] == "active" and tab_id:
+            binding = repo.bind_tab(session_id, tab_id)
+            if binding == "duplicate_tab":
+                repo.ban_session(session_id, "duplicate_tab")
+                session = dict(repo.get_session(session_id))  # type: ignore[arg-type]
+            elif binding in {"finished", "banned"}:
+                session = dict(repo.get_session(session_id))  # type: ignore[arg-type]
         if session["status"] == "active" and session["deadline"] <= time.time():
             repo.finish_session(session_id, "timeout")
             session = dict(repo.get_session(session_id))  # type: ignore[arg-type]

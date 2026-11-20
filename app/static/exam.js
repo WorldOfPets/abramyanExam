@@ -10,7 +10,9 @@
     navigating: false,
     banSent: false,
     fullscreenArmed: false,
-    focusArmedAt: 0,
+    fullscreenPending: false,
+    everFocused: document.hasFocus(),
+    focusReadyAt: document.hasFocus() ? Date.now() + 1500 : 0,
     deadline: Date.now() + cfg.remainingSeconds * 1000,
     current: null,
     solved: {},
@@ -28,6 +30,10 @@
     "return", "True", "False", "None", "and", "or", "not", "in", "is", "break",
     "continue", "try", "except", "pass", "import", "from",
   ];
+
+  const tabId = window.crypto && typeof window.crypto.randomUUID === "function"
+    ? window.crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
   for (const task of cfg.tasks) {
     state.solved[task.id] = Boolean(task.solved);
@@ -441,7 +447,7 @@
   async function syncState() {
     if (state.finished || state.navigating) return;
     try {
-      const response = await fetch(cfg.stateUrl, {
+      const response = await fetch(`${cfg.stateUrl}?tab=${encodeURIComponent(tabId)}`, {
         credentials: "same-origin",
         cache: "no-store",
       });
@@ -558,9 +564,19 @@
     return root.requestFullscreen || root.webkitRequestFullscreen || null;
   }
 
+  function markFocus() {
+    const now = Date.now();
+    if (!state.everFocused) {
+      state.everFocused = true;
+      state.focusReadyAt = now + 1500;
+    }
+  }
+
   function armFullscreen() {
     state.fullscreenArmed = true;
-    state.focusArmedAt = Date.now();
+    state.fullscreenPending = false;
+    markFocus();
+    state.focusReadyAt = Math.max(state.focusReadyAt, Date.now() + 800);
     if (fullscreenGate) fullscreenGate.hidden = true;
     if (fullscreenError) fullscreenError.textContent = "";
     document.querySelector(".exam-topbar")?.removeAttribute("inert");
@@ -580,15 +596,20 @@
   }
 
   function handleWindowBlur() {
-    if (!state.fullscreenArmed || state.finished || state.navigating || state.banSent) return;
-    if (Date.now() - state.focusArmedAt < 1200) return;
+    if (!state.everFocused || state.finished || state.navigating || state.banSent) return;
+    if (state.fullscreenPending || Date.now() < state.focusReadyAt) return;
     sendViolation("focus_lost");
   }
 
   function checkWindowFocus() {
-    if (!state.fullscreenArmed || state.finished || state.navigating || state.banSent) return;
-    if (Date.now() - state.focusArmedAt < 1200) return;
+    if (!state.everFocused || state.finished || state.navigating || state.banSent) return;
+    if (state.fullscreenPending || Date.now() < state.focusReadyAt) return;
     if (!document.hasFocus()) sendViolation("focus_lost");
+  }
+
+  function handleWindowFocus() {
+    markFocus();
+    syncState();
   }
 
   const ALLOWED_CTRL_KEYS = new Set([
@@ -617,6 +638,7 @@
   }
 
   function handleKeyDown(event) {
+    markFocus();
     if (!isBlockedShortcut(event)) return;
     event.preventDefault();
     event.stopImmediatePropagation();
@@ -631,6 +653,7 @@
       return;
     }
     if (fullscreenError) fullscreenError.textContent = "";
+    state.fullscreenPending = true;
     fullscreenButton.disabled = true;
     try {
       const attempt = request.call(document.documentElement);
@@ -649,6 +672,7 @@
       }
     } finally {
       fullscreenButton.disabled = false;
+      if (!state.fullscreenArmed) state.fullscreenPending = false;
     }
   }
 
@@ -708,12 +732,13 @@
   document.addEventListener("fullscreenchange", handleFullscreenChange);
   document.addEventListener("webkitfullscreenchange", handleFullscreenChange);
   document.addEventListener("keydown", handleKeyDown, true);
+  document.addEventListener("pointerdown", markFocus, true);
   document.addEventListener("contextmenu", (event) => event.preventDefault());
   window.addEventListener("blur", handleWindowBlur);
   window.addEventListener("pagehide", handlePageHide);
-  window.addEventListener("focus", syncState);
+  window.addEventListener("focus", handleWindowFocus);
   if (fullscreenButton) fullscreenButton.addEventListener("click", enterFullscreen);
-  setInterval(checkWindowFocus, 1000);
+  setInterval(checkWindowFocus, 500);
 
   document.querySelector(".exam-topbar")?.setAttribute("inert", "");
   document.querySelector(".exam-layout")?.setAttribute("inert", "");

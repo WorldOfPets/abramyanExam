@@ -32,7 +32,8 @@ CREATE TABLE IF NOT EXISTS sessions (
     last_seen REAL NOT NULL,
     score INTEGER NOT NULL DEFAULT 0,
     total_tasks INTEGER NOT NULL DEFAULT 5,
-    client_ip TEXT
+    client_ip TEXT,
+    tab_id TEXT
 );
 
 CREATE TABLE IF NOT EXISTS session_tasks (
@@ -116,6 +117,12 @@ class Repository:
     def _init_schema(self) -> None:
         with self._connection() as connection:
             connection.executescript(SCHEMA)
+            columns = {
+                row["name"]
+                for row in connection.execute("PRAGMA table_info(sessions)").fetchall()
+            }
+            if "tab_id" not in columns:
+                connection.execute("ALTER TABLE sessions ADD COLUMN tab_id TEXT")
 
     # ------------------------------------------------------------------ sessions
     def create_session(
@@ -193,6 +200,43 @@ class Repository:
                 "UPDATE sessions SET last_seen = ? WHERE id = ? AND status = 'active'",
                 (at, session_id),
             )
+
+    def bind_tab(
+        self, session_id: str, tab_id: str, at: float | None = None
+    ) -> str:
+        """Bind a session to the first browser tab that talks to it.
+
+        A second tab with a different random ID is an attempt to run the same
+        exam twice; the caller turns ``duplicate_tab`` into a ban.
+        """
+        at = now() if at is None else at
+        with self._lock, self._connection() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            session = connection.execute(
+                "SELECT status, tab_id FROM sessions WHERE id = ?", (session_id,)
+            ).fetchone()
+            if session is None:
+                connection.rollback()
+                return "not_found"
+            if session["status"] != "active":
+                connection.rollback()
+                return str(session["status"])
+            current = session["tab_id"]
+            if current is None:
+                connection.execute(
+                    "UPDATE sessions SET tab_id = ?, last_seen = ? WHERE id = ?",
+                    (tab_id, at, session_id),
+                )
+                connection.commit()
+                return "ok"
+            if not secrets.compare_digest(str(current), tab_id):
+                connection.rollback()
+                return "duplicate_tab"
+            connection.execute(
+                "UPDATE sessions SET last_seen = ? WHERE id = ?", (at, session_id)
+            )
+            connection.commit()
+            return "ok"
 
     def save_code(self, session_id: str, task_id: str, code: str, at: float | None = None) -> None:
         at = now() if at is None else at

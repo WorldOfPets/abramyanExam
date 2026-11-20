@@ -189,6 +189,19 @@ def test_focus_loss_bans_session(client: TestClient) -> None:
     assert "Alt+Tab" in page.text
 
 
+def test_second_tab_bans_session(client: TestClient) -> None:
+    session_id, _ = _start(client)
+    first = client.get(f"/api/exam/{session_id}/state?tab=tab-a")
+    assert first.status_code == 200
+    assert first.json()["status"] == "active"
+    second = client.get(f"/api/exam/{session_id}/state?tab=tab-b")
+    assert second.status_code == 200
+    assert second.json()["status"] == "banned"
+    page = client.get(f"/banned/{session_id}")
+    assert page.status_code == 200
+    assert "вторая вкладка" in page.text
+
+
 def test_finish_and_result(client: TestClient) -> None:
     session_id, _ = _start(client)
     response = client.post(f"/api/exam/{session_id}/finish", json={})
